@@ -175,11 +175,11 @@ function drawCosts() {
     return false;
 }
 
+
+// Draw barchart with D3
 function drawCost(id, dim, group, hlPub, hlObs) {
     var counts = group.reduceSum(function(r){return r.cost;}).all();
-    // for(var i = 0; i< counts.length; ++i){
-    //     console.log(counts[i]);
-    // }
+
     var saved = {key: counts[0].key, value: counts[0].value};
 
     var width = 400,
@@ -200,21 +200,26 @@ function drawCost(id, dim, group, hlPub, hlObs) {
     var bar = chart.selectAll("g")
             .data(counts)
             .enter().append("g")
-            .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; });
+            .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; })
+            .on("click", function(d) { 
+                var rect = d3.select(this).select('rect');
+                if ( rect.classed('selected') ) {
+                    rect.classed('selected', false);
+                    dim.filterAll();
+                } else {
+                    chart.select('.selected').classed('selected', false);
+                    dim.filterAll();
+                    rect.classed('selected', true);
+                    console.log('Filter on: '+d.key);
+                    dim.filter(d.key);
+                    highlight[hlPub]();
+                }
+            });
 
     bar.append("rect")
         .attr({width: function(d) { return x(d.value); },
-               height: barHeight - 1})
-        .on("mouseover", function(d) {
-            d3.select(this).style("fill", "plum");
-            console.log('Filter on: '+d.key);
-            dim.filter(d.key);
-            highlight[hlPub]();
-        })
-        .on("mouseout", function(d) {
-            d3.select(this).style("fill", "");
-            dim.filterAll();
-        });
+               height: barHeight - 1});
+
 
     highlight.on(hlObs, function(){
 //        var newCounts = dim.group().reduceSum(function(r){return r.cost;}).all();
@@ -222,16 +227,16 @@ function drawCost(id, dim, group, hlPub, hlObs) {
     });
 
     bar.append("text")
-        .attr("x", function(d) { return x(d.value) - 3; })
-        .attr("y", barHeight / 2)
-        .attr("dy", ".35em")
+        .attr({x: function(d) { return x(d.value) - 3; },
+               y: barHeight / 2,
+               dy: ".35em"})
         .text(function(d) { return d.value; });
 
     bar.append("text")
         .classed("lab", true)
-        .attr("x", 20)
-        .attr("y", barHeight / 2)
-        .attr("dy", ".35em")
+        .attr({x: 2,
+               y: barHeight / 2,
+               dy: ".35em"})
         .text(function(d) { return d.key; });
 
     return false;
