@@ -204,13 +204,14 @@ function drawCost(id, dim, group, hlPub, hlObs) {
         var rect = d3.select(this).select('rect');
         if ( rect.classed('selected') ) {
             rect.classed('selected', false);
+            highlight[hlPub]();
             dim.filterAll();
         } else {
             chart.select('.selected').classed('selected', false);
             rect.classed('selected', true);
             console.log('Filter on: '+d.key);
             timea(dim.filter, d.key, 'Filter on '+d.key+': ');
-            highlight[hlPub]();
+            highlight[hlPub](d.key);
         }
     });
 
@@ -218,9 +219,9 @@ function drawCost(id, dim, group, hlPub, hlObs) {
         .classed('overlay', true);
     var overlay = chart_svg.select('.overlay');
 
-    highlight.on(hlObs, function(){
+    highlight.on(hlObs, function(key){
         overlay.selectAll('g').remove();
-        drawBarChart(x, barHeight, overlay, counts);
+        if ( key ) drawBarChart(x, barHeight, overlay, counts);
     });
 
 
