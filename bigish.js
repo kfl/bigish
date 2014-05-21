@@ -188,43 +188,54 @@ function drawCost(id, dim, group, hlPub, hlObs) {
     var val = function(d){return d.value;};
 
     var x = d3.scale.linear()
-              .domain([0.95*d3.min(counts, val), d3.max(counts, val)])
+            .domain([0, d3.max(counts, val)])
             .range([0, width]);
 
-    var chart = d3.select(id)
-                  .attr("width", width)
-                  .attr("height", barHeight * counts.length);
+    var chart_svg = d3.select(id)
+            .attr("width", width)
+            .attr("height", barHeight * counts.length);
 
-    chart.selectAll('g').remove();
+    chart_svg.append("g")
+        .classed('base', true);
+    var chart = chart_svg.select('.base');
 
+    var baseBars = drawBarChart(x, barHeight, chart, counts);
+    baseBars.on("click", function(d) { 
+        var rect = d3.select(this).select('rect');
+        if ( rect.classed('selected') ) {
+            rect.classed('selected', false);
+            dim.filterAll();
+        } else {
+            chart.select('.selected').classed('selected', false);
+            rect.classed('selected', true);
+            console.log('Filter on: '+d.key);
+            timea(dim.filter, d.key, 'Filter on '+d.key+': ');
+            highlight[hlPub]();
+        }
+    });
+
+    chart_svg.append("g")
+        .classed('overlay', true);
+    var overlay = chart_svg.select('.overlay');
+
+    highlight.on(hlObs, function(){
+        overlay.selectAll('g').remove();
+        drawBarChart(x, barHeight, overlay, counts);
+    });
+
+
+    return false;
+}
+
+function drawBarChart(x, barHeight, chart, counts) {
     var bar = chart.selectAll("g")
             .data(counts)
             .enter().append("g")
-            .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; })
-            .on("click", function(d) { 
-                var rect = d3.select(this).select('rect');
-                if ( rect.classed('selected') ) {
-                    rect.classed('selected', false);
-                    dim.filterAll();
-                } else {
-                    chart.select('.selected').classed('selected', false);
-                    dim.filterAll();
-                    rect.classed('selected', true);
-                    console.log('Filter on: '+d.key);
-                    dim.filter(d.key);
-                    highlight[hlPub]();
-                }
-            });
+            .attr("transform", function(d, i) { return "translate(0," + i * barHeight + ")"; });
 
     bar.append("rect")
         .attr({width: function(d) { return x(d.value); },
                height: barHeight - 1});
-
-
-    highlight.on(hlObs, function(){
-//        var newCounts = dim.group().reduceSum(function(r){return r.cost;}).all();
-        console.log(hlObs+' '+saved.key+' '+saved.value+', '+counts[0].key+' '+counts[0].value);
-    });
 
     bar.append("text")
         .attr({x: function(d) { return x(d.value) - 3; },
@@ -239,7 +250,7 @@ function drawCost(id, dim, group, hlPub, hlObs) {
                dy: ".35em"})
         .text(function(d) { return d.key; });
 
-    return false;
+    return bar;
 }
 
 
