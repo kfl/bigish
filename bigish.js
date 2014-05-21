@@ -121,7 +121,8 @@ function generate_data(n_arg) {
                   m_cost: random_int(10, 10000)*mdg[4],
                   noise: random_gauss(),
                   drg: drgs(),
-                  mdg: mdgs()});
+                  mdg: mdgs(),
+                  gender: random_int(0,1)});
             
     }
     var end = new Date().getTime();
@@ -277,8 +278,8 @@ function makeIdxs(grps) {
 function makeIndexes() {
     var n = +document.getElementById('rows').value;
     data = generate_data(n);
-    var idxs = timea(makeRevIdx, [function(d){ return d.drg;}, function(d){ return d.mdg;}], 
-                     'Reverse Indexes: ');
+    var idxs = timea(makeIdxs, [function(d){ return d.drg;}, function(d){ return d.mdg;}], 
+                     'Indexes: ');
 
     drgIdx = idxs[0], mdgIdx = idxs[1]; 
 
