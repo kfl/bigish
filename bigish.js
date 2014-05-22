@@ -203,7 +203,8 @@ function drawCost(id, dim, group, hlPub, hlObs) {
         var rect = d3.select(this).select('rect');
         if ( rect.classed('selected') ) {
             rect.classed('selected', false);
-            dim.filter('Kasper');  // Hack suggested by Professor Hornbæk, works surprisingly well
+            dim.filter('Kasper');  // Hack suggested by Professor Hornbæk, works surprisingly well.
+                                   // Relies on Kasper being a unique individual not to be found in mere data.
             highlight[hlPub]();
         } else {
             chart.select('.selected').classed('selected', false);
