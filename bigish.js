@@ -177,11 +177,9 @@ function drawCosts() {
 }
 
 
-// Draw barchart with D3
+// Draw barchart with D3 based on data from Crossfilter
 function drawCost(id, dim, group, hlPub, hlObs) {
     var counts = group.reduceSum(function(r){return r.cost;}).all();
-
-    var saved = {key: counts[0].key, value: counts[0].value};
 
     var width = 400,
         barHeight = 20;
@@ -205,8 +203,8 @@ function drawCost(id, dim, group, hlPub, hlObs) {
         var rect = d3.select(this).select('rect');
         if ( rect.classed('selected') ) {
             rect.classed('selected', false);
+            dim.filter('Kasper');  // Hack suggested by Professor Hornbæk, works surprisingly well
             highlight[hlPub]();
-            dim.filterAll();
         } else {
             chart.select('.selected').classed('selected', false);
             rect.classed('selected', true);
@@ -229,6 +227,8 @@ function drawCost(id, dim, group, hlPub, hlObs) {
     return false;
 }
 
+
+// Draw a barchart from a key-value mapping with D3
 function drawBarChart(x, barHeight, chart, counts) {
     var bar = chart.selectAll("g")
             .data(counts)
