@@ -116,13 +116,15 @@ function generate_data(n_arg) {
 
     for(var i=0; i < n; ++i) {
         var drg = drgs(), mdg = mdgs();
-        buf.push({cost: random_int(0, 1000)*drg[4],
+        var cost = random_int(0, 1000)*(1/(1+drg[4]));
+        var bias = random_int(0,3);
+        buf.push({cost: cost,
                   days: random_int(0, 10)+mdg[3],
-                  m_cost: random_int(10, 10000)*mdg[4],
+                  m_cost: random_int(10, 10000)*(+mdg[4]),
                   noise: random_gauss(),
-                  drg: drgs(),
-                  mdg: mdgs(),
-                  gender: random_int(0,1)});
+                  drg: drg,
+                  mdg: mdg,
+                  gender: bias < 3 ? 'm' : 'f'});
             
     }
     var end = new Date().getTime();
@@ -138,16 +140,18 @@ function generate_data(n_arg) {
  * 
  *************************************************************************************/
 
-var data_cf, drg, drgG, mdg, mdgG;
-var highlight = d3.dispatch("drgCost", "mdgCost");
+var data_cf, drg, drgG, mdg, mdgG, gender, genderG;
+var selected = d3.map(), lastDim;
+var filter = d3.dispatch("filter");
 
 function populate_cf() {
     var start = new Date().getTime();
     var n = +document.getElementById('rows').value;
     var buf = generate_data(n);
+    data = buf;
 
-    data_cf = crossfilter([]);
-    data_cf.add(buf);
+    data_cf = crossfilter(buf);
+//    data_cf.add(buf);
     var count = data_cf.groupAll().reduceCount().value();
 
 
@@ -162,26 +166,30 @@ function populate_cf() {
 
 function setupDim() {
     drg = timea(data_cf.dimension,function(d){return d.drg;},'DRG Dimension: ');
-    drgG = time(drg.group().reduceCount, 'DRG Group & Reduce: ');
+    drgG = time(drg.group, 'DRG Grouping: ');
 
     mdg = timea(data_cf.dimension,function(d){return d.mdg;},'MDG Dimension: ');
-    mdgG = time(mdg.group, 'MDG Group & Reduce: ');
-    
+    mdgG = time(mdg.group, 'MDG Grouping: ');
+
+    gender = timea(data_cf.dimension,function(d){return d.gender;},'Gender Dimension: ');
+    genderG = time(gender.group, 'Gender Grouping: ');
+   
     return false;
 }
 
 function drawCosts() {
-    drawCost('#drgs', drg, drgG, "drgCost", "mdgCost");
-    drawCost('#mdgs', mdg, mdgG, "mdgCost", "drgCost");
+    drawCost('#drgs', drg, drgG);
+    drawCost('#mdgs', mdg, mdgG);
+    drawCost('#genders', gender, genderG);
     return false;
 }
 
 
 // Draw barchart with D3 based on data from Crossfilter
-function drawCost(id, dim, group, hlPub, hlObs) {
+function drawCost(id, dim, group) {
     var counts = group.reduceSum(function(r){return r.cost;}).all();
 
-    var width = 400,
+    var width = 300,
         barHeight = 20;
 
     var val = function(d){return d.value;};
@@ -201,17 +209,28 @@ function drawCost(id, dim, group, hlPub, hlObs) {
     var baseBars = drawBarChart(x, barHeight, chart, counts);
     baseBars.on("click", function(d) { 
         var rect = d3.select(this).select('rect');
-        if ( rect.classed('selected') ) {
+        if ( selected.get(id) === d.key ) {
             rect.classed('selected', false);
-            dim.filter('Kasper');  // Hack suggested by Professor Hornbæk, works surprisingly well.
-                                   // Relies on Kasper being a unique individual not to be found in mere data.
-            highlight[hlPub]();
+            selected.remove(id);
+
+            if (selected.empty()) {
+                lastDim = dim;
+                dim.filter('Kasper');  // Hack suggested by Professor Hornbæk, works surprisingly well.
+                                       // Relies on Kasper being a unique individual not to be found in mere data.
+            } else {
+                time(dim.filterAll, 'Remove all filters on '+id+': ');
+            }
+            filter['filter'](id);
         } else {
             chart.select('.selected').classed('selected', false);
             rect.classed('selected', true);
+            selected.set(id, d.key);
             console.log('Filter on: '+d.key);
             timea(dim.filter, d.key, 'Filter on '+d.key+': ');
-            highlight[hlPub](d.key);
+            if( lastDim && lastDim !== dim) time(lastDim.filterAll, 'Remove all filters on lastDim: ');
+            lastDim = undefined;
+
+            filter['filter'](id, d.key);
         }
     });
 
@@ -219,9 +238,13 @@ function drawCost(id, dim, group, hlPub, hlObs) {
         .classed('overlay', true);
     var overlay = chart_svg.select('.overlay');
 
-    highlight.on(hlObs, function(key){
+    filter.on('filter.'+id.slice(1), function(cat, key){
+        console.log('Got it: '+cat+' ('+id+') '+key);
         overlay.selectAll('g').remove();
-        if ( key ) drawBarChart(x, barHeight, overlay, counts);
+        if ( !selected.has(id) && !selected.empty() ) {
+            counts = group.all();
+            drawBarChart(x, barHeight, overlay, counts);
+        }
     });
 
 
@@ -231,6 +254,11 @@ function drawCost(id, dim, group, hlPub, hlObs) {
 
 // Draw a barchart from a key-value mapping with D3
 function drawBarChart(x, barHeight, chart, counts) {
+    // counts.forEach(function (elem){
+    //     console.log(elem.key+': '+elem.value);
+    // });
+
+
     var bar = chart.selectAll("g")
             .data(counts)
             .enter().append("g")
