@@ -272,7 +272,7 @@ function drawBarChart(x, barHeight, chart, counts) {
         .attr({x: function(d) { return x(d.value) - 3; },
                y: barHeight / 2,
                dy: ".35em"})
-        .text(function(d) { return d.value; });
+        .text(function(d) { return d.value|0; });
 
     bar.append("text")
         .classed("lab", true)
