@@ -296,8 +296,8 @@ function makeIdxs(grps) {
         for(var j = 0; j < idxs.length; ++j){
             var gi = idxs[j];
             var g = gi.grp(dat);
-            var inds = gi.idx.get(g) || d3.set();
-            inds.add(i);
+            var inds = gi.idx.get(g) || [];
+            inds.push(i);
             gi.idx.set(g, inds);
         }
     }
@@ -349,20 +349,34 @@ function computeCosts(idxs, selected) {
 var selectedI = d3.map();
 var selectedCosts;
 
-function intersection(sets){
-    var sorted = _.sortBy(sets, function(s){ return s.size();});
-    var res = d3.set();
-    if (sorted.length > 0) {
-        var rest = sorted.slice(1);
-        sorted[0].forEach(function(e){ if ( _.every(rest, function(s){ return s.has(e); }) ) res.add(e); });
+function intersection(arrs){
+    if(arrs.length === 0) return [];
+    if(arrs.length === 1) return arrs[0];
+    var arrays = _.invoke(arrs, 'slice', 0);      // make copies, so we can use destructive operations
+
+    var res = [];
+    function nonEmpty(a){ return a.length > 0; }
+    while( _.every(arrays, nonEmpty) ) {
+        var lasts = _.map(arrays, _.last);
+        if(_.size(_.groupBy(lasts, _.identity)) === 1) {
+            res.push(_.first(lasts));
+            _.invoke(arrays, 'pop');
+        } else {
+            var min = _.min(lasts);
+            _.each(arrays, function(arr) {
+                while(nonEmpty(arr) && _.last(arr) > min) 
+                    arr.pop();
+            });
+        }
     }
+
     return res;
 }
 
 function addSelection(id, idx, key) {
     selectedI.set(id, idx.get(key));
     var selected = timea(intersection, selectedI.values(), 'Intersection: ');
-    selectedCosts = _.reduce(mapCosts(selected.values()), 
+    selectedCosts = _.reduce(mapCosts(selected), 
                              function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
                              d3.map());
 }
@@ -370,7 +384,7 @@ function addSelection(id, idx, key) {
 function removeSelection(id, key) {
     selectedI.remove(id);
     var selected = timea(intersection, selectedI.values(), 'Intersection: ');
-    selectedCosts = _.reduce(mapCosts(selected.values()), 
+    selectedCosts = _.reduce(mapCosts(selected), 
                              function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
                              d3.map());
 }
