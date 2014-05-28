@@ -318,18 +318,23 @@ function makeIndexes() {
 }
 
 function drawCostsManual() {
-    var costs = timea(_.partial(computeCosts, idxs), _.range(0, data.length), 'Compute costs: ');
-    var viz = _.zip(['#drgs', '#mdgs', '#genders'], _.map(costs, function(c){ return c.costs.entries();}));
-    _.each(viz, function(v){ drawCostManual.apply(null, v); });
+    var viz = mapCosts(_.range(0, data.length));
+    _.each(viz, function(v){ drawCostManual(v[0], v[1].idx, v[1].costs.entries()); });
 
     return false;
+}
+
+function mapCosts(selected) {
+    var costs = timea(_.partial(computeCosts, idxs), selected, 'Compute costs: ');
+    var viz = _.zip(['#drgs', '#mdgs', '#genders'], costs);
+    return viz;
 }
 
 
 function computeCosts(idxs, selected) {
     var costs = _.map(idxs, function(idx) {
         var gcosts = _.reduce(idx.idx.keys(), function(m, key){ m.set(key, 0|0); return m; }, d3.map());
-        return {grp: idx.grp, costs: gcosts};});
+        return {grp: idx.grp, idx: idx.idx, costs: gcosts};});
 
     _.each(selected, function (i) {
         var elem = data[i];
@@ -341,9 +346,30 @@ function computeCosts(idxs, selected) {
     return costs;
 }
 
+var selectedI = d3.map();
+var selectedCosts;
+
+function addSelection(id, idx, key) {
+    selectedI.set(id, idx.get(key));
+    var selected = _.intersection.apply(null, selectedI.values());
+    selectedCosts = _.reduce(mapCosts(selected), 
+                             function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
+                             d3.map());
+}
+
+function removeSelection(id, key) {
+    selectedI.remove(id);
+    var selected = _.intersection.apply(null, selectedI.values());
+    selectedCosts = _.reduce(mapCosts(selected), 
+                             function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
+                             d3.map());
+}
+
+
+
 
 // Draw barchart with D3 based on a array of key-value counts 
-function drawCostManual(id, counts) {
+function drawCostManual(id, idx, counts) {
 //    var counts = group.reduceSum(function(r){return r.cost;}).all();
 
     var width = 300,
@@ -364,45 +390,34 @@ function drawCostManual(id, counts) {
     var chart = chart_svg.select('.base');
 
     var baseBars = drawBarChart(x, barHeight, chart, counts);
-    // baseBars.on("click", function(d) { 
-    //     var rect = d3.select(this).select('rect');
-    //     if ( selected.get(id) === d.key ) {
-    //         rect.classed('selected', false);
-    //         selected.remove(id);
+    baseBars.on("click", function(d) { 
+        var rect = d3.select(this).select('rect');
+        if ( selected.get(id) === d.key ) {
+            rect.classed('selected', false);
+            selected.remove(id);
+            removeSelection(id, d.key);
+            filter['filter'](id);
+        } else {
+            chart.select('.selected').classed('selected', false);
+            rect.classed('selected', true);
+            selected.set(id, d.key);
+            addSelection(id, idx, d.key);
+            console.log('Filter on: '+d.key);
+            filter['filter'](id, d.key);
+        }
+    });
 
-    //         if (selected.empty()) {
-    //             lastDim = dim;
-    //             dim.filter('Kasper');  // Hack suggested by Professor Hornbæk, works surprisingly well.
-    //                                    // Relies on Kasper being a unique individual not to be found in mere data.
-    //         } else {
-    //             time(dim.filterAll, 'Remove all filters on '+id+': ');
-    //         }
-    //         filter['filter'](id);
-    //     } else {
-    //         chart.select('.selected').classed('selected', false);
-    //         rect.classed('selected', true);
-    //         selected.set(id, d.key);
-    //         console.log('Filter on: '+d.key);
-    //         timea(dim.filter, d.key, 'Filter on '+d.key+': ');
-    //         if( lastDim && lastDim !== dim) time(lastDim.filterAll, 'Remove all filters on lastDim: ');
-    //         lastDim = undefined;
+    chart_svg.append("g")
+        .classed('overlay', true);
+    var overlay = chart_svg.select('.overlay');
 
-    //         filter['filter'](id, d.key);
-    //     }
-    // });
-
-    // chart_svg.append("g")
-    //     .classed('overlay', true);
-    // var overlay = chart_svg.select('.overlay');
-
-    // filter.on('filter.'+id.slice(1), function(cat, key){
-    //     console.log('Got it: '+cat+' ('+id+') '+key);
-    //     overlay.selectAll('g').remove();
-    //     if ( !selected.has(id) && !selected.empty() ) {
-    //         counts = group.all();
-    //         drawBarChart(x, barHeight, overlay, counts);
-    //     }
-    // });
+    filter.on('filter.'+id.slice(1), function(cat, key){
+        console.log('Got it: '+cat+' ('+id+') '+key);
+        overlay.selectAll('g').remove();
+        if ( !selected.has(id) && !selected.empty() ) {
+            drawBarChart(x, barHeight, overlay, selectedCosts.get(id));
+        }
+    });
 
 
     return false;
