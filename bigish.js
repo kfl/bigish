@@ -296,9 +296,9 @@ function makeIdxs(grps) {
         for(var j = 0; j < idxs.length; ++j){
             var gi = idxs[j];
             var g = gi.grp(dat);
-            var arr = gi.idx.get(g) || [];
-            arr.push(i);
-            gi.idx.set(g, arr);
+            var inds = gi.idx.get(g) || d3.set();
+            inds.add(i);
+            gi.idx.set(g, inds);
         }
     }
     return idxs;
@@ -349,18 +349,28 @@ function computeCosts(idxs, selected) {
 var selectedI = d3.map();
 var selectedCosts;
 
+function intersection(sets){
+    var sorted = _.sortBy(sets, function(s){ return s.size();});
+    var res = d3.set();
+    if (sorted.length > 0) {
+        var rest = sorted.slice(1);
+        sorted[0].forEach(function(e){ if ( _.every(rest, function(s){ return s.has(e); }) ) res.add(e); });
+    }
+    return res;
+}
+
 function addSelection(id, idx, key) {
     selectedI.set(id, idx.get(key));
-    var selected = _.intersection.apply(null, selectedI.values());
-    selectedCosts = _.reduce(mapCosts(selected), 
+    var selected = timea(intersection, selectedI.values(), 'Intersection: ');
+    selectedCosts = _.reduce(mapCosts(selected.values()), 
                              function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
                              d3.map());
 }
 
 function removeSelection(id, key) {
     selectedI.remove(id);
-    var selected = _.intersection.apply(null, selectedI.values());
-    selectedCosts = _.reduce(mapCosts(selected), 
+    var selected = timea(intersection, selectedI.values(), 'Intersection: ');
+    selectedCosts = _.reduce(mapCosts(selected.values()), 
                              function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
                              d3.map());
 }
