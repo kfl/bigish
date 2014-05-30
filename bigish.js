@@ -317,39 +317,7 @@ function makeIndexes() {
     return false;
 }
 
-function drawCostsManual() {
-    var viz = mapCosts(_.range(0, data.length));
-    _.each(viz, function(v){ drawCostManual(v[0], v[1].idx, v[1].costs.entries()); });
-
-    return false;
-}
-
-function mapCosts(selected) {
-    var costs = timea(_.partial(computeCosts, idxs), selected, 'Compute costs: ');
-    var viz = _.zip(['#drgs', '#mdgs', '#genders'], costs);
-    return viz;
-}
-
-
-function computeCosts(idxs, selected) {
-    var costs = _.map(idxs, function(idx) {
-        var gcosts = _.reduce(idx.idx.keys(), function(m, key){ m.set(key, 0|0); return m; }, d3.map());
-        return {grp: idx.grp, idx: idx.idx, costs: gcosts};});
-
-    _.each(selected, function (i) {
-        var elem = data[i];
-        costs.forEach(function(dim) {
-            var g = dim.grp(elem);
-            dim.costs.set(g, dim.costs.get(g) + elem.cost);
-        });
-    });
-    return costs;
-}
-
-var selectedI = d3.map();
-var selectedCosts;
-
-function intersection(arrs){
+function intersection_destructive(arrs){
     if(arrs.length === 0) return [];
     if(arrs.length === 1) return arrs[0];
     var arrays = _.invoke(arrs, 'slice', 0);      // make copies, so we can use destructive operations
@@ -373,19 +341,117 @@ function intersection(arrs){
     return res;
 }
 
+function intersection(arrs){
+    if(arrs.length === 0) return [];
+    if(arrs.length === 1) return arrs[0];
+
+    var arrays = _.map(arrs, function(a){ return {arr: a, last: a.length-1};});
+    function nonEmpty(a){ return a.last >= 0; }
+    function pop(a){ a.last--; }
+    function last(a){ return a.arr[a.last]; }
+    
+    function allEqual(elems) { 
+        var first = elems[0];
+        for(var i = 1; i < elems.length; ++i)
+            if ( elems[i] !== first ) return false;
+        return true;
+    }
+
+    var res = [];
+
+    while( _.every(arrays, nonEmpty) ) {
+        var lasts = _.map(arrays, last);
+        if (allEqual(lasts)) {
+            res.push(_.first(lasts));
+            arrays.forEach(pop);
+        } else {
+            var min = _.min(lasts);
+            arrays.forEach(function(arr) {
+                while(nonEmpty(arr) && last(arr) > min) 
+                    pop(arr);
+            });
+        }
+    }
+
+    return res;
+}
+
+
+function drawCostsManual() {
+    var costs = timea(computeCostsAll, idxs, 'Compute all costs: ');
+    var viz = _.zip(['#drgs', '#mdgs', '#genders'], costs);
+    //var viz = mapCosts([]);
+    _.each(viz, function(v){ drawCostManual(v[0], v[1].idx, v[1].costs); });
+
+    return false;
+}
+
+function mapCosts(selected) {
+    var costs = timea(_.partial(computeCosts, idxs), selected, 'Compute costs: ');
+    var viz = _.zip(['#drgs', '#mdgs', '#genders'], costs);
+    return viz;
+}
+
+function computeCostsAll(idxs) {
+    var costs = _.map(idxs, function(idx) {
+        var gcosts = _.reduce(idx.idx.entries(), function(m, entry){
+            var total = _.reduce(entry.value, 
+                                 function(acc, i){
+                                     var d = data[i];
+                                     return acc + d.cost|0; },
+                                 0|0);
+            m.push({key: entry.key, value: total}); return m; }, []);
+        return {grp: idx.grp, idx: idx.idx, costs: gcosts};});
+
+    return costs;
+}
+
+function computeCosts(idxs, selected) {
+    // var active = selected.length > 0 ? selected : [];
+    // var costs = _.map(idxs, function(idx) {
+    //     var gcosts = _.reduce(idx.idx.entries(), function(m, entry){
+    //         active.push(entry.value);
+    //         var total = _.reduce(intersection(active), 
+    //                              function(acc, i){
+    //                                  var d = data[i];
+    //                                  return acc + d.cost|0; },
+    //                              0|0);
+    //         active.pop();
+    //         m.push({key: entry.key, value: total}); 
+    //         return m; }, []);
+    //     return {grp: idx.grp, idx: idx.idx, costs: gcosts};});
+
+    // return costs;
+    var costs = _.map(idxs, function(idx) {
+        var gcosts = _.reduce(idx.idx.keys(), function(m, key){ m.set(key, 0|0); return m; }, d3.map());
+        return {grp: idx.grp, idx: idx.idx, costs: gcosts};});
+
+    _.each(selected, function (i) {
+        var elem = data[i];
+        costs.forEach(function(dim) {
+            var g = dim.grp(elem);
+            dim.costs.set(g, dim.costs.get(g) + elem.cost);
+        });
+    });
+    return _.map(costs, function(c){ return {grp: c.grp, idx: c.idx, costs: c.costs.entries()};});
+}
+
+var selectedI = d3.map();
+var selectedCosts;
+
 function addSelection(id, idx, key) {
     selectedI.set(id, idx.get(key));
-    var selected = timea(intersection, selectedI.values(), 'Intersection: ');
+    var selected = intersection(selectedI.values());
     selectedCosts = _.reduce(mapCosts(selected), 
-                             function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
+                             function(m, e){ m.set(e[0], e[1].costs); return m;},
                              d3.map());
 }
 
 function removeSelection(id, key) {
     selectedI.remove(id);
-    var selected = timea(intersection, selectedI.values(), 'Intersection: ');
+    var selected = intersection(selectedI.values());
     selectedCosts = _.reduce(mapCosts(selected), 
-                             function(m, e){ m.set(e[0], e[1].costs.entries()); return m;},
+                             function(m, e){ m.set(e[0], e[1].costs); return m;},
                              d3.map());
 }
 
